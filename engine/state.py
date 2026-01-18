@@ -120,10 +120,31 @@ class GameState:
             self.shuttle_y = AI_Y + t * (PLAYER_Y - AI_Y)
 
             if t >= 1:
-                if abs(self.shuttle_x - self.player_x) < CATCH_RADIUS:
+                # ---------- DYNAMIC CATCH RADIUS ----------
+                shot = getattr(self, "shot_type", "NORMAL")
+
+                # Base catch radius
+                dynamic_radius = CATCH_RADIUS
+
+                # Shot difficulty
+                if shot == "SMASH":
+                    dynamic_radius *= 0.65
+                elif shot == "DROP":
+                    dynamic_radius *= 1.25
+                elif shot == "CLEAR":
+                    dynamic_radius *= 1.0
+
+                # Player movement penalty (moving fast = harder to catch)
+                movement_speed = abs(self.target_player_x - self.player_x)
+                dynamic_radius -= movement_speed * 0.4
+
+                dynamic_radius = max(0.3, dynamic_radius)
+
+                if abs(self.shuttle_x - self.player_x) < dynamic_radius:
                     print("🏆 Rally WON")
                 else:
                     print("❌ Rally LOST")
 
                 self.state = "IDLE"
                 self.player_ready = False
+
