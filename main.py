@@ -119,9 +119,13 @@ while True:
         1,
     )
 
+        # ---- DYNAMIC PLAYER / AI Y (2.5D) ----
+    player_y = getattr(game, "player_y", CONSTANTS["PLAYER_Y"])
+    ai_y = getattr(game, "ai_y", CONSTANTS["AI_Y"])
+
     cv2.circle(
         vis,
-        (to_px(game.player_x), CONSTANTS["PLAYER_Y"]),
+        (to_px(game.player_x), int(player_y)),
         15,
         (255, 0, 0),
         -1,
@@ -129,11 +133,12 @@ while True:
 
     cv2.circle(
         vis,
-        (to_px(game.ai_x), CONSTANTS["AI_Y"]),
+        (to_px(game.ai_x), int(ai_y)),
         15,
         (0, 0, 255),
         -1,
     )
+
 
     cv2.circle(
         vis,
