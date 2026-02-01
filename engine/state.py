@@ -171,6 +171,7 @@ class GameState:
             dynamic_radius -= movement_speed * 0.4
             dynamic_radius = max(0.3, dynamic_radius)
 
+
             # Distance to player
             dist_x = abs(self.shuttle_x - self.player_x)
             dist_y = abs(self.shuttle_y - self.player_y)
