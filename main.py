@@ -1,8 +1,6 @@
 import cv2
 import time
 from engine.shots import classify_shot
-
-
 from vision.hand_tracking import HandTracker
 from engine.state import GameState
 
@@ -27,7 +25,7 @@ CONSTANTS = {
         "CLEAR": 1.6,
         "DROP": 0.9,
         "NORMAL": 1.0,
-    }
+    },
 }
 
 # ---------------- INIT ----------------
@@ -35,17 +33,47 @@ cap = cv2.VideoCapture(0)
 tracker = HandTracker()
 game = GameState()
 
+# ---------------- HELPERS ----------------
 def clamp(val, minv, maxv):
     return max(minv, min(maxv, val))
 
 def detect_stroke(dx, dy):
-    return abs(dx) > CONSTANTS["MOVE_THRESHOLD"] or abs(dy) > CONSTANTS["MOVE_THRESHOLD"]
+    if dx is None or dy is None:
+        return False
+    return (
+        abs(dx) > CONSTANTS["MOVE_THRESHOLD"]
+        or abs(dy) > CONSTANTS["MOVE_THRESHOLD"]
+    )
 
 def to_px(x_unit):
     return int(
         50
         + x_unit * ((CONSTANTS["SCREEN_W"] - 100) / CONSTANTS["COURT_WIDTH"])
     )
+
+# ---------------- AVATAR DRAW ----------------
+def draw_avatar(vis, x, y, color, facing="up", show_reach=False, reach_radius=40):
+    x = int(x)
+    y = int(y)
+
+    # Head
+    cv2.circle(vis, (x, y - 18), 8, color, -1)
+
+    # Body
+    cv2.line(vis, (x, y - 10), (x, y + 18), color, 3)
+
+    # Arm / racket direction
+    if facing == "up":
+        arm_end = (x, y - 35)
+    else:
+        arm_end = (x, y + 35)
+
+    cv2.line(vis, (x, y), arm_end, color, 2)
+    cv2.circle(vis, arm_end, 4, (200, 200, 200), -1)
+
+    # Reach circle (visual explanation)
+    if show_reach:
+        cv2.circle(vis, (x, y), reach_radius, (200, 200, 200), 1)
 
 print("🎮 Badminton Game – STABLE BASE VERSION")
 
@@ -65,8 +93,9 @@ while True:
         mapped_x = clamp(mapped_x, 0, 1)
         game.target_player_x = mapped_x * CONSTANTS["COURT_WIDTH"]
 
-        # Player becomes ready again
-        if game.state == "IDLE" and not game.player_ready:
+    # -------- PLAYER READY --------
+    if game.state == "IDLE" and not game.player_ready:
+        if dx is not None and dy is not None:
             if (
                 abs(dx) < CONSTANTS["NEUTRAL_THRESHOLD"]
                 and abs(dy) < CONSTANTS["NEUTRAL_THRESHOLD"]
@@ -74,20 +103,19 @@ while True:
                 game.player_ready = True
                 print("🟢 Player ready")
 
-        # Player hits shuttle
-        elif (
-            game.state == "IDLE"
-            and game.player_ready
-            and now - game.last_stroke_time > CONSTANTS["COOLDOWN"]
-        ):
-            if detect_stroke(dx, dy):
-                shot = classify_shot(dx, dy)
+    # -------- PLAYER HIT --------
+    elif (
+        game.state == "IDLE"
+        and game.player_ready
+        and now - game.last_stroke_time > CONSTANTS["COOLDOWN"]
+    ):
+        if detect_stroke(dx, dy):
+            shot = classify_shot(dx, dy)
 
-                if shot:
-                    print(f"🏸 Shot played: {shot}")
+            if shot:
+                print(f"🏸 Shot played: {shot}")
 
-                game.start_player_hit(now, shot if shot else "NORMAL")
-
+            game.start_player_hit(now, shot if shot else "NORMAL")
 
     # -------- PLAYER MOVEMENT --------
     delta = clamp(
@@ -103,6 +131,7 @@ while True:
     # -------- DRAW --------
     vis = frame.copy()
 
+    # Court
     cv2.rectangle(
         vis,
         (50, 50),
@@ -119,27 +148,33 @@ while True:
         1,
     )
 
-        # ---- DYNAMIC PLAYER / AI Y (2.5D) ----
+    # ---- DYNAMIC PLAYER / AI Y (2.5D) ----
     player_y = getattr(game, "player_y", CONSTANTS["PLAYER_Y"])
     ai_y = getattr(game, "ai_y", CONSTANTS["AI_Y"])
 
-    cv2.circle(
+    # Player avatar
+    draw_avatar(
         vis,
-        (to_px(game.player_x), int(player_y)),
-        15,
+        to_px(game.player_x),
+        int(player_y),
         (255, 0, 0),
-        -1,
+        facing="up",
+        show_reach=True,
+        reach_radius=45,
     )
 
-    cv2.circle(
+    # AI avatar
+    draw_avatar(
         vis,
-        (to_px(game.ai_x), int(ai_y)),
-        15,
+        to_px(game.ai_x),
+        int(ai_y),
         (0, 0, 255),
-        -1,
+        facing="down",
+        show_reach=True,
+        reach_radius=40,
     )
 
-
+    # Shuttle
     cv2.circle(
         vis,
         (to_px(game.shuttle_x), int(game.shuttle_y)),
@@ -149,6 +184,7 @@ while True:
     )
 
     cv2.imshow("Badminton Game", vis)
+
     if cv2.waitKey(1) & 0xFF == ord("q"):
         break
 
