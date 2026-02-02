@@ -6,6 +6,7 @@ SMASH_SPEED = 0.045      # lower than before
 CLEAR_SPEED = 0.025
 DROP_SPEED  = 0.015
 
+
 UPWARD_DY = -0.08       # much less strict
 DOWNWARD_DY = 0.08
 
