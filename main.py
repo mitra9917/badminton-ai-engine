@@ -73,7 +73,7 @@ def draw_avatar(vis, x, y, color, facing="up", show_reach=False, reach_radius=40
 
     # Reach circle (visual explanation)
     if show_reach:
-        cv2.circle(vis, (x, y), reach_radius, (200, 200, 200), 1)
+        cv2.circle(vis, (x, y), reach_radius+20 , (0, 255, 255), 2)
 
 print("🎮 Badminton Game – STABLE BASE VERSION")
 
