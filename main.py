@@ -142,19 +142,22 @@ while True:
 
     # -------- NET (HEIGHT ILLUSION) --------
 
-    # -------- NET (GROUND VIEW – CORRECTED HEIGHT & DEPTH) --------
+    # -------- NET (FULL WIDTH + HEIGHT + MESH) --------
 
-    # Net depth (slightly toward AI side)
-    net_y = 370   # ⬅️ was ~400, move upward for realism
+    # Net depth (slightly toward AI side for ground view)
+    net_y = 365
 
-    # Net width must match court perspective at this depth
-    net_left_x  = 255
-    net_right_x = 345
+    # Net must match court width at this depth
+    net_left_x  = far_left[0] 
+    net_right_x = far_right[0] 
 
-    # Net height illusion
-    net_height = 22
+    # Net visual height
+    net_height = 32
 
-    # Bottom shadow (ground contact)
+    # Mesh spacing (smaller = finer mesh)
+    mesh_step = 6
+
+    # -------- Bottom tape / shadow (ground contact) --------
     cv2.line(
         vis,
         (net_left_x, net_y + 3),
@@ -163,18 +166,32 @@ while True:
         2,
     )
 
-    # Vertical net body (leaning back illusion)
-    for i in range(net_height):
-        shade = 190 - i * 4
+    # -------- Vertical mesh lines --------
+    for x in range(net_left_x, net_right_x, mesh_step):
+        # Perspective tilt: lines converge upward
+        tilt = int((x - net_left_x) * 0.04)
         cv2.line(
             vis,
-            (net_left_x + i // 3, net_y - i),
-            (net_right_x - i // 3, net_y - i),
+            (x, net_y),
+            (x + tilt, net_y - net_height),
+            (170, 170, 170),
+            1,
+        )
+
+    # -------- Horizontal mesh lines --------
+    for i in range(0, net_height, mesh_step):
+        shade = 190 - i * 2
+        left = net_left_x + i // 3
+        right = net_right_x - i // 3
+        cv2.line(
+            vis,
+            (left, net_y - i),
+            (right, net_y - i),
             (shade, shade, shade),
             1,
         )
 
-    # Top tape
+    # -------- Top tape (white, crisp) --------
     cv2.line(
         vis,
         (net_left_x + net_height // 3, net_y - net_height),
