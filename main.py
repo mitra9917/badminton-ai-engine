@@ -1,5 +1,7 @@
 import cv2
 import time
+import numpy as np
+
 from engine.shots import classify_shot
 from vision.hand_tracking import HandTracker
 from engine.state import GameState
@@ -9,8 +11,8 @@ CONSTANTS = {
     "COURT_WIDTH": 10,
     "SCREEN_W": 600,
     "SCREEN_H": 800,
-    "PLAYER_Y": 650,
-    "AI_Y": 150,
+    "PLAYER_Y": 680,
+    "AI_Y": 200,
     "SHUTTLE_TIME": 0.65,
     "AI_REACT_TIME": 0.4,
     "COOLDOWN": 0.8,
@@ -19,13 +21,7 @@ CONSTANTS = {
     "HAND_SENSITIVITY": 1.8,
     "SMOOTHING": 0.35,
     "MAX_PLAYER_SPEED": 0.9,
-    "CATCH_RADIUS": 0.8,
-    "SHOT_TIME_MODIFIERS": {
-        "SMASH": 0.45,
-        "CLEAR": 1.6,
-        "DROP": 0.9,
-        "NORMAL": 1.0,
-    },
+    "CATCH_RADIUS": 0.8
 }
 
 # ---------------- INIT ----------------
@@ -49,39 +45,42 @@ def to_px(x_unit):
 
 # ---------------- GROUND VIEW PROJECTION ----------------
 def project_to_ground_view(x_unit, y_px):
-    depth = (y_px - 50) / (CONSTANTS["SCREEN_H"] - 100)
+    depth = (y_px - 100) / (CONSTANTS["SCREEN_H"] - 200)
     depth = max(0, min(1, depth))
 
-    scale = 0.5 + depth * 0.7
+    scale = 0.45 + depth * 0.75
     center_x = CONSTANTS["SCREEN_W"] // 2
     flat_x = to_px(x_unit)
 
     proj_x = int(center_x + (flat_x - center_x) * scale)
-    proj_y = int(y_px * (0.85 + depth * 0.15))
+    proj_y = int(y_px * (0.8 + depth * 0.2))
 
     return proj_x, proj_y, scale
 
 # ---------------- AVATAR DRAW ----------------
-def draw_avatar(vis, x, y, color, facing="up", show_reach=False, reach_radius=40):
+def draw_avatar(vis, x, y, scale, color, facing="up"):
     x = int(x)
     y = int(y)
 
+    head_r = int(8 * scale)
+    body_len = int(28 * scale)
+
     # Head
-    cv2.circle(vis, (x, y - 18), 8, color, -1)
+    cv2.circle(vis, (x, y - body_len), head_r, color, -1)
 
     # Body
-    cv2.line(vis, (x, y - 10), (x, y + 18), color, 3)
+    cv2.line(vis, (x, y - body_len + head_r), (x, y + body_len), color, 3)
 
     # Arm / racket
-    arm_end = (x, y - 35) if facing == "up" else (x, y + 35)
+    arm_offset = int(40 * scale)
+    arm_end = (x, y - arm_offset) if facing == "up" else (x, y + arm_offset)
     cv2.line(vis, (x, y), arm_end, color, 2)
-    cv2.circle(vis, arm_end, 4, (200, 200, 200), -1)
+    cv2.circle(vis, arm_end, int(5 * scale), (200, 200, 200), -1)
 
-    # Yellow wide reach circle
-    if show_reach:
-        cv2.circle(vis, (x, y), reach_radius + 20, (0, 255, 255), 2)
+    # Reach (yellow)
+    cv2.circle(vis, (x, y), int(60 * scale), (0, 255, 255), 2)
 
-print("🎮 Badminton Game – Ground View Version")
+print("🎮 Badminton Game — Ground View Camera")
 
 # ---------------- MAIN LOOP ----------------
 while True:
@@ -104,7 +103,6 @@ while True:
         if dx is not None and dy is not None:
             if abs(dx) < CONSTANTS["NEUTRAL_THRESHOLD"] and abs(dy) < CONSTANTS["NEUTRAL_THRESHOLD"]:
                 game.player_ready = True
-                print("🟢 Player ready")
 
     # -------- PLAYER HIT --------
     elif (
@@ -114,8 +112,6 @@ while True:
     ):
         if detect_stroke(dx, dy):
             shot = classify_shot(dx, dy)
-            if shot:
-                print(f"🏸 Shot played: {shot}")
             game.start_player_hit(now, shot if shot else "NORMAL")
 
     # -------- PLAYER MOVEMENT --------
@@ -132,26 +128,36 @@ while True:
     # -------- DRAW --------
     vis = frame.copy()
 
-    # Court
-    cv2.rectangle(vis, (50, 50), (550, 750), (0, 200, 0), 2)
-    cv2.line(vis, (50, 400), (550, 400), (200, 200, 200), 1)
+    # -------- COURT (GROUND VIEW TRAPEZOID) --------
+    # Near side (player side) – MUCH wider
+    near_left  = (20, 740)
+    near_right = (580, 740)
 
+    # Far side (AI side) – wider but still narrow for perspective
+    far_left   = (170, 180)
+    far_right  = (430, 180)
+
+    court = np.array([near_left, near_right, far_right, far_left], np.int32)
+    cv2.polylines(vis, [court], True, (0, 200, 0), 2)
+
+    # Net
+    cv2.line(vis, (260, 400), (340, 400), (200, 200, 200), 2)
+
+    # -------- PLAYERS --------
     player_y = getattr(game, "player_y", CONSTANTS["PLAYER_Y"])
     ai_y = getattr(game, "ai_y", CONSTANTS["AI_Y"])
 
-    # Player (near)
-    px, py, pscale = project_to_ground_view(game.player_x, player_y)
-    draw_avatar(vis, px, py, (255, 0, 0), "up", True, int(45 * pscale))
+    px, py, ps = project_to_ground_view(game.player_x, player_y)
+    draw_avatar(vis, px, py, ps, (255, 0, 0), "up")
 
-    # AI (far)
-    ax, ay, ascale = project_to_ground_view(game.ai_x, ai_y)
-    draw_avatar(vis, ax, ay, (0, 0, 255), "down", True, int(40 * ascale))
+    ax, ay, as_ = project_to_ground_view(game.ai_x, ai_y)
+    draw_avatar(vis, ax, ay, as_, (0, 0, 255), "down")
 
-    # Shuttle
-    sx, sy, sscale = project_to_ground_view(game.shuttle_x, game.shuttle_y)
-    cv2.circle(vis, (sx, sy), max(3, int(8 * sscale)), (255, 255, 255), -1)
+    # -------- SHUTTLE --------
+    sx, sy, ss = project_to_ground_view(game.shuttle_x, game.shuttle_y)
+    cv2.circle(vis, (sx, sy), max(3, int(8 * ss)), (255, 255, 255), -1)
 
-    cv2.imshow("Badminton Game – Ground View", vis)
+    cv2.imshow("Badminton Game — Ground View", vis)
     if cv2.waitKey(1) & 0xFF == ord("q"):
         break
 
