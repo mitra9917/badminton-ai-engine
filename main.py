@@ -140,8 +140,50 @@ while True:
     court = np.array([near_left, near_right, far_right, far_left], np.int32)
     cv2.polylines(vis, [court], True, (0, 200, 0), 2)
 
-    # Net
-    cv2.line(vis, (260, 400), (340, 400), (200, 200, 200), 2)
+    # -------- NET (HEIGHT ILLUSION) --------
+
+    # -------- NET (GROUND VIEW – CORRECTED HEIGHT & DEPTH) --------
+
+    # Net depth (slightly toward AI side)
+    net_y = 370   # ⬅️ was ~400, move upward for realism
+
+    # Net width must match court perspective at this depth
+    net_left_x  = 255
+    net_right_x = 345
+
+    # Net height illusion
+    net_height = 22
+
+    # Bottom shadow (ground contact)
+    cv2.line(
+        vis,
+        (net_left_x, net_y + 3),
+        (net_right_x, net_y + 3),
+        (110, 110, 110),
+        2,
+    )
+
+    # Vertical net body (leaning back illusion)
+    for i in range(net_height):
+        shade = 190 - i * 4
+        cv2.line(
+            vis,
+            (net_left_x + i // 3, net_y - i),
+            (net_right_x - i // 3, net_y - i),
+            (shade, shade, shade),
+            1,
+        )
+
+    # Top tape
+    cv2.line(
+        vis,
+        (net_left_x + net_height // 3, net_y - net_height),
+        (net_right_x - net_height // 3, net_y - net_height),
+        (255, 255, 255),
+        2,
+    )
+
+
 
     # -------- PLAYERS --------
     player_y = getattr(game, "player_y", CONSTANTS["PLAYER_Y"])
