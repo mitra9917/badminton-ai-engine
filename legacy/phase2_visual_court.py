@@ -146,7 +146,7 @@ while True:
         if t >= 1.0:
             if abs(shuttle_x - player_x) < CATCH_RADIUS:
                 shuttle_x, shuttle_y = player_x, PLAYER_Y
-                print("🏆 Rally WON")
+                print("✅ Rally WON")
             else:
                 print("❌ Rally LOST")
 
